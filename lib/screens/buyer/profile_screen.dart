@@ -5,6 +5,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:kisanbazaar/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -110,6 +112,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _logout() async {
+    try {
+      await _auth.signOut();
+
+      // Clear saved preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('buyer_selectedIndex');
+
+      if (!mounted) return;
+
+      // Navigate to Login Screen and clear navigation stack
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error logging out: $e",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -137,15 +164,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             CircleAvatar(
                               radius: 60,
                               backgroundImage:
-                                  imageUrl != null
+                                  imageUrl != null && imageUrl!.isNotEmpty
                                       ? NetworkImage(imageUrl!)
                                       : null,
                               backgroundColor: Colors.grey.shade300,
                               child:
-                                  imageUrl == null
+                                  (imageUrl == null || imageUrl!.isEmpty)
                                       ? Text(
-                                        name?.substring(0, 1).toUpperCase() ??
-                                            '?',
+                                        name?.isNotEmpty == true
+                                            ? name!
+                                                .substring(0, 1)
+                                                .toUpperCase()
+                                            : '?',
                                         style: const TextStyle(
                                           fontSize: 40,
                                           fontWeight: FontWeight.bold,
@@ -237,6 +267,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 20),
 
+                      const SizedBox(height: 20),
+
                       // Update Profile Button
                       SizedBox(
                         width: double.infinity,
@@ -252,6 +284,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: const Text(
                             'Update Profile',
                             style: TextStyle(fontSize: 16, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+
+                      // Logout Button
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _logout,
+                          icon: const Icon(Icons.logout, color: Colors.red),
+                          label: const Text(
+                            'Logout',
+                            style: TextStyle(fontSize: 16, color: Colors.red),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
                       ),

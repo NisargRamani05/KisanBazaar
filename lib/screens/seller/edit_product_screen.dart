@@ -1,6 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'dart:convert';
+import 'dart:convert' show base64Encode;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -32,7 +32,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
 
   File? _image;
   Uint8List? _imageBytes;
-  String? _existingImageBase64;
+  String? _existingImageUrl;
   final picker = ImagePicker();
 
   @override
@@ -44,7 +44,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _quantityController = TextEditingController(text: widget.productData['quantity']?.toString() ?? '');
     _categoryController = TextEditingController(text: widget.productData['category'] ?? '');
     _sellerNameController = TextEditingController(text: widget.productData['seller_name'] ?? '');
-    _existingImageBase64 = widget.productData['image'];
+    _existingImageUrl = widget.productData['image'];
   }
 
   @override
@@ -58,12 +58,18 @@ class _EditProductScreenState extends State<EditProductScreen> {
   }
 
   Future<void> _pickImage() async {
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 600,
+      maxHeight: 600,
+    );
     if (pickedFile != null) {
       final bytes = await pickedFile.readAsBytes();
+      debugPrint('Edit: Picked image size: ${bytes.length} bytes (${(bytes.length / 1024).toStringAsFixed(1)} KB)');
       setState(() {
         _imageBytes = bytes;
-        _existingImageBase64 = null; // Clear existing image when new one is picked
+        _existingImageUrl = null; // Clear existing image when new one is picked
         if (!kIsWeb) {
           _image = File(pickedFile.path);
         }
@@ -77,7 +83,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
         _quantityController.text.isEmpty ||
         _categoryController.text.isEmpty ||
         _sellerNameController.text.isEmpty ||
-        (_imageBytes == null && _existingImageBase64 == null)) {
+        (_imageBytes == null && _existingImageUrl == null)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text("Please fill all fields and ensure an image is selected"),
@@ -99,8 +105,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
         },
       );
 
-      // Use new image if picked, otherwise keep existing
-      String imageToSave = _existingImageBase64 ?? base64Encode(_imageBytes!);
+      // Convert new image to base64, otherwise keep existing image string
+      String imageToSave = _existingImageUrl ?? '';
+      if (_imageBytes != null) {
+        imageToSave = base64Encode(_imageBytes!);
+        debugPrint('Edit: Image base64 length: ${imageToSave.length} chars');
+      }
 
       await FirebaseFirestore.instance
           .collection('products')
@@ -193,13 +203,15 @@ class _EditProductScreenState extends State<EditProductScreen> {
                                 borderRadius: BorderRadius.circular(75),
                                 child: Image.memory(_imageBytes!, fit: BoxFit.cover),
                               )
-                            : _existingImageBase64 != null
+                            : _existingImageUrl != null && _existingImageUrl!.isNotEmpty
                                 ? ClipRRect(
                                     borderRadius: BorderRadius.circular(75),
-                                    child: Image.memory(
-                                      base64Decode(_existingImageBase64!),
-                                      fit: BoxFit.cover,
-                                    ),
+                                    child: Image.network(
+                                            _existingImageUrl!,
+                                            fit: BoxFit.cover,
+                                            width: 150,
+                                            height: 150,
+                                          ),
                                   )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,

@@ -12,7 +12,7 @@
 - 📦 **Track Order Status** (Pending → Shipped → Delivered)
 - 🗣 **Chat with Sellers** (Optional)
 - 🔔 **Order & Notification Alerts**
-- 💳 **Multiple Payment Options** (Cash on Delivery, Online Payment - Optional)
+- 💳 **Payment Option**: Cash on Delivery (online payments removed)
 
 ### 🚜 For Farmers (Sellers):
 - 📤 **List Products with Custom Pricing**

@@ -9,17 +9,17 @@ class AppColors {
   static const Color primaryDark = Color(0xFF005005); // Dark Green
   
   // Secondary Colors - Earthy tones
-  static const Color secondary = Color(0xFF8D6E63); // Brown
+  static const Color secondary = Color(0xFF8D6E63); // Warm Brown
   static const Color secondaryLight = Color(0xFFBE9C91);
   static const Color secondaryDark = Color(0xFF5D4037);
   
   // Accent Colors
-  static const Color accent = Color(0xFFFFB300); // Golden Yellow (harvest)
-  static const Color accentLight = Color(0xFFFFE54C);
-  static const Color accentDark = Color(0xFFC68400);
+  static const Color accent = Color(0xFF66BB6A); // Fresh Leaf Green
+  static const Color accentLight = Color(0xFF98EE99);
+  static const Color accentDark = Color(0xFF338A3E);
   
   // Background Colors
-  static const Color background = Color(0xFFF5F5F5); // Light Gray
+  static const Color background = Color(0xFFF9F6EF); // Soft Cream
   static const Color backgroundDark = Color(0xFF121212); // Dark mode
   static const Color surface = Color(0xFFFFFFFF); // White
   static const Color surfaceDark = Color(0xFF1E1E1E);

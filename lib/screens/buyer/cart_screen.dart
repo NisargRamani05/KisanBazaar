@@ -25,60 +25,62 @@ class _CartScreenState extends State<CartScreen> {
     ).showSnackBar(const SnackBar(content: Text("Item removed from cart!")));
   }
 
-  // void _updateQuantity(
-  //   String cartItemId,
-  //   int newQuantity,
-  //   String productId,
-  // ) async {
-  //   try {
-  //     // Fetch the product's available stock from Firestore
-  //     DocumentSnapshot productSnapshot =
-  //         await FirebaseFirestore.instance
-  //             .collection('products')
-  //             .doc(productId)
-  //             .get();
+  void _updateQuantity(
+    String cartItemId,
+    int newQuantity,
+    String productId,
+  ) async {
+    try {
+      // Fetch the product's available stock from Firestore
+      DocumentSnapshot productSnapshot =
+          await FirebaseFirestore.instance
+              .collection('products')
+              .doc(productId)
+              .get();
 
-  //     if (productSnapshot.exists) {
-  //       var productData = productSnapshot.data() as Map<String, dynamic>;
-  //       int availableStock = productData['quantity'] ?? 0;
+      if (productSnapshot.exists) {
+        var productData = productSnapshot.data() as Map<String, dynamic>;
+        int availableStock = int.tryParse(productData['quantity']?.toString() ?? '0') ?? 0;
 
-  //       // Check if the new quantity exceeds the available stock
-  //       if (newQuantity > availableStock) {
-  //         ScaffoldMessenger.of(context).showSnackBar(
-  //           SnackBar(
-  //             content: Text("Only $availableStock items available in stock!"),
-  //             backgroundColor: Colors.orange,
-  //           ),
-  //         );
-  //         return;
-  //       }
+        // Check if the new quantity exceeds the available stock
+        if (newQuantity > availableStock) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("Only $availableStock items available in stock!"),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          return;
+        }
 
-  //       // Update the quantity in the cart if valid
-  //       if (newQuantity > 0) {
-  //         await FirebaseFirestore.instance
-  //             .collection('cart')
-  //             .doc(cartItemId)
-  //             .update({'quantity': newQuantity});
-  //         setState(() {}); // Trigger UI rebuild
-  //       } else {
-  //         _removeFromCart(cartItemId);
-  //       }
-  //     }
-  //   } catch (e) {
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text("Failed to update quantity: $e"),
-  //         backgroundColor: Colors.red,
-  //       ),
-  //     );
-  //   }
-  // }
+        // Update the quantity in the cart if valid
+        if (newQuantity > 0) {
+          await FirebaseFirestore.instance
+              .collection('cart')
+              .doc(cartItemId)
+              .update({'quantity': newQuantity});
+        } else {
+          _removeFromCart(cartItemId);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Failed to update quantity: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
   double _calculateTotal(List<QueryDocumentSnapshot> docs) {
     double total = 0;
     for (var doc in docs) {
       var data = doc.data() as Map<String, dynamic>;
-      total += (data['price'] ?? 0) * (data['quantity'] ?? 1);
+      double itemPrice = double.tryParse(data['price']?.toString() ?? '0') ?? 0.0;
+      int itemQuantity = data['quantity'] ?? 1;
+      total += itemPrice * itemQuantity;
     }
     return total;
   }
@@ -113,7 +115,8 @@ class _CartScreenState extends State<CartScreen> {
           'productId': productId, // Add the productId
           'name': productData['name'],
           'price': productData['price'],
-          'quantity': productData['quantity'], // Default quantity
+          'quantity': 1, // Default quantity when adding to cart
+          'unit': productData['unit'],
           'sellerId': productData['sellerId'],
           'image': productData['image'],
         });
@@ -169,12 +172,19 @@ class _CartScreenState extends State<CartScreen> {
                                   child:
                                       (data['image'] != null &&
                                               data['image'].isNotEmpty)
-                                          ? Image.memory(
-                                            base64Decode(data['image']),
-                                            width: 60,
-                                            height: 60,
-                                            fit: BoxFit.cover,
-                                          )
+                                          ? (data['image'].startsWith('http')
+                                              ? Image.network(
+                                                  data['image'],
+                                                  width: 60,
+                                                  height: 60,
+                                                  fit: BoxFit.cover,
+                                                )
+                                              : Image.memory(
+                                                  base64Decode(data['image']),
+                                                  width: 60,
+                                                  height: 60,
+                                                  fit: BoxFit.cover,
+                                                ))
                                           : const Icon(
                                             Icons.image,
                                             size: 60,
@@ -203,12 +213,34 @@ class _CartScreenState extends State<CartScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-                                      Text(
-                                        "Quantity: ${data['quantity']} kg",
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          color: Colors.black54,
-                                        ),
+                                      Row(
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(Icons.remove_circle_outline, color: Colors.green),
+                                            constraints: const BoxConstraints(),
+                                            padding: EdgeInsets.zero,
+                                            onPressed: () {
+                                              _updateQuantity(doc.id, (data['quantity'] ?? 1) - 1, data['productId']);
+                                            },
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            "${data['quantity']} ${data['unit']?.toString().replaceAll('/', '') ?? 'kg'}",
+                                            style: const TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          IconButton(
+                                            icon: const Icon(Icons.add_circle_outline, color: Colors.green),
+                                            constraints: const BoxConstraints(),
+                                            padding: EdgeInsets.zero,
+                                            onPressed: () {
+                                              _updateQuantity(doc.id, (data['quantity'] ?? 1) + 1, data['productId']);
+                                            },
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
@@ -265,10 +297,11 @@ class _CartScreenState extends State<CartScreen> {
                               cartItems.map((doc) {
                                 var data = doc.data() as Map<String, dynamic>;
                                 return {
-                                  'productId': doc.id,
+                                  'productId': data['productId'] ?? doc.id,
                                   'name': data['name'],
                                   'price': data['price'],
                                   'quantity': data['quantity'],
+                                  'unit': data['unit'],
                                   'sellerId': data['sellerId'],
                                   'image': data['image'],
                                 };

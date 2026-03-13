@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:kisanbazaar/theme/app_colors.dart';
 
 /// Typography styles for KisanBazaar
+
+
 class AppTextStyles {
   // Display Styles - Large headings
   static const TextStyle displayLarge = TextStyle(

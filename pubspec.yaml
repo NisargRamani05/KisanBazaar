@@ -43,6 +43,9 @@ dependencies:
   confetti: ^0.8.0
   fluttertoast: ^8.2.12
   intl: ^0.20.2
+  google_fonts: ^8.0.2
+  http: ^1.6.0
+  flutter_local_notifications: ^21.0.0
 
 dev_dependencies:
   flutter_test:
@@ -58,7 +61,7 @@ dev_dependencies:
 
 flutter_launcher_icons:
   android: true
-  ios: true
+  ios: false
   web:
     generate: true
   image_path: "assets/images/logo.png"

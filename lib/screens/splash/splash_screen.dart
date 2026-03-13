@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:kisanbazaar/screens/auth/login_screen.dart';
 import 'package:kisanbazaar/screens/buyer/buyer_dashboard.dart';
 import 'package:kisanbazaar/screens/seller/seller_dashboard.dart';
+import 'package:kisanbazaar/theme/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,6 +16,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _animation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
@@ -24,6 +26,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
       vsync: this,
     );
     _animation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
+    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
 
     _controller.forward();
     _checkUserStatus();
@@ -91,46 +96,58 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: Center(
         child: FadeTransition(
           opacity: _animation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // KisanBazaar Logo
-              Image.asset(
-                'assets/images/logo.png',
-                width: 150,
-                height: 150,
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                "KisanBazaar",
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2E7D32), // Professional Dark Green
-                  letterSpacing: 1.2,
-                  fontFamily: 'Roboto', // Clean sans-serif
+          child: ScaleTransition(
+            scale: _scaleAnimation,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // KisanBazaar Logo
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.primary.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: Image.asset(
+                    'assets/images/logo.png',
+                    width: 120,
+                    height: 120,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                "Farm to Market, Simplified",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
-                  letterSpacing: 0.5,
+                const SizedBox(height: 30),
+                Text(
+                  "KisanBazaar",
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 50),
-
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2E7D32)),
-                strokeWidth: 3,
-              ),
-            ],
+                const SizedBox(height: 8),
+                Text(
+                  "Fresh From Farmers 🌾",
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppColors.textSecondary,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 50),
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                  strokeWidth: 3,
+                ),
+              ],
+            ),
           ),
         ),
       ),

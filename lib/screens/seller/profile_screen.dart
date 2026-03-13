@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:kisanbazaar/screens/auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -112,6 +114,26 @@ class _SellerProfileScreenState extends State<ProfileScreen> {
         backgroundColor: Colors.red,
         textColor: Colors.white,
         fontSize: 16.0,
+      );
+    }
+  }
+
+  Future<void> _logout() async {
+    try {
+      await _auth.signOut();
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('seller_selectedIndex');
+      if (!mounted) return;
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Error logging out: $e",
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
       );
     }
   }
@@ -263,6 +285,34 @@ class _SellerProfileScreenState extends State<ProfileScreen> {
                                     style: TextStyle(
                                       fontSize: 16,
                                       color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10), // Added spacing
+                              // Logout Button
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: _logout,
+                                  icon: const Icon(
+                                    Icons.logout,
+                                    color: Colors.red,
+                                  ),
+                                  label: const Text(
+                                    'Logout',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Colors.red),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 12,
                                     ),
                                   ),
                                 ),

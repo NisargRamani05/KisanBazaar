@@ -239,13 +239,20 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
               // Product Image
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: imageBase64 != null
-                    ? Image.memory(
-                        base64Decode(imageBase64),
-                        width: 100,
-                        height: 100,
-                        fit: BoxFit.cover,
-                      )
+                child: imageBase64 != null && imageBase64.isNotEmpty
+                    ? (imageBase64.startsWith('http')
+                        ? Image.network(
+                            imageBase64,
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          )
+                        : Image.memory(
+                            base64Decode(imageBase64),
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          ))
                     : Container(
                         width: 100,
                         height: 100,

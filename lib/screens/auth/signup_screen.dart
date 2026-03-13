@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kisanbazaar/screens/auth/login_screen.dart';
+import 'package:kisanbazaar/theme/app_colors.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -165,74 +166,127 @@ class _SignupScreenState extends State<SignupScreen> {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    "I am a:",
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.grey[800],
+                    "Choose Your Role",
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 16),
 
-                // Role Toggles
+                // Large Role Selection Cards
                 Row(
                   children: [
                     Expanded(
                       child: GestureDetector(
-                         onTap: () => setState(() => selectedRole = "Buyer"),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        onTap: () => setState(() => selectedRole = "Buyer"),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
                           decoration: BoxDecoration(
                             color: selectedRole == "Buyer"
-                                ? const Color(0xFF2E7D32)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                                ? AppColors.primary.withOpacity(0.1)
+                                : AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: const Color(0xFF2E7D32),
+                              color: selectedRole == "Buyer"
+                                  ? AppColors.primary
+                                  : AppColors.divider,
+                              width: selectedRole == "Buyer" ? 2 : 1,
                             ),
+                            boxShadow: [
+                              if (selectedRole == "Buyer")
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                            ],
                           ),
-                          child: Center(
-                            child: Text(
-                              "Buyer",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: selectedRole == "Buyer"
-                                    ? Colors.white
-                                    : const Color(0xFF2E7D32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                "🛍️",
+                                style: TextStyle(fontSize: 40),
                               ),
-                            ),
+                              const SizedBox(height: 12),
+                              Text(
+                                "Buyer",
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: selectedRole == "Buyer"
+                                      ? AppColors.primary
+                                      : AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Shop fresh goods",
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 15),
+                    const SizedBox(width: 16),
                     Expanded(
                       child: GestureDetector(
                         onTap: () => setState(() => selectedRole = "Seller"),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 15),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
                           decoration: BoxDecoration(
                             color: selectedRole == "Seller"
-                                ? const Color(0xFF2E7D32)
-                                : Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                                ? AppColors.primary.withOpacity(0.1)
+                                : AppColors.surface,
+                            borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: const Color(0xFF2E7D32),
+                              color: selectedRole == "Seller"
+                                  ? AppColors.primary
+                                  : AppColors.divider,
+                              width: selectedRole == "Seller" ? 2 : 1,
                             ),
+                            boxShadow: [
+                              if (selectedRole == "Seller")
+                                BoxShadow(
+                                  color: AppColors.primary.withOpacity(0.2),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                ),
+                            ],
                           ),
-                          child: Center(
-                            child: Text(
-                              "Farmer / Seller",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: selectedRole == "Seller"
-                                    ? Colors.white
-                                    : const Color(0xFF2E7D32),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Text(
+                                "🚜",
+                                style: TextStyle(fontSize: 40),
                               ),
-                            ),
+                              const SizedBox(height: 12),
+                              Text(
+                                "Farmer",
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: selectedRole == "Seller"
+                                      ? AppColors.primary
+                                      : AppColors.textPrimary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Sell your produce",
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
