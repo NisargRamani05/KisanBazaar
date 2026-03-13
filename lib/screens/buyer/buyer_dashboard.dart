@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:kisanbazaar/theme/app_colors.dart';
 import 'package:kisanbazaar/screens/buyer/product_details_screen.dart'
     as kisanbazaar;
+import 'package:kisanbazaar/screens/buyer/my_orders_screen.dart';
 
 class BuyerDashboard extends StatefulWidget {
   const BuyerDashboard({super.key});
@@ -32,6 +33,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     _listenToCartCount();
     _initializeNotifications();
     _listenForNewProducts();
+    _listenForOrderUpdates();
   }
 
   Future<void> _initializeNotifications() async {
@@ -78,12 +80,44 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     });
   }
 
-  Future<void> _showNotification(String productName, String sellerName) async {
+  void _listenForOrderUpdates() {
+    String? userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    FirebaseFirestore.instance
+        .collection('orders')
+        .where('buyerId', isEqualTo: userId)
+        .snapshots()
+        .listen((snapshot) {
+      if (_isInitialLoad) return; // Wait until initial data is loaded to avoid spam
+
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.modified) {
+          var data = change.doc.data() as Map<String, dynamic>?;
+          if (data != null) {
+            String status = data['status'] ?? '';
+            String productName = data['productName'] ?? 'Your order';
+            String reason = data['cancelReason'] ?? '';
+
+            if (status.isNotEmpty) {
+               String body = 'Order status updated to ${status.toUpperCase()}';
+               if ((status.toLowerCase() == 'declined' || status.toLowerCase() == 'cancelled') && reason.isNotEmpty) {
+                 body += '. Reason: $reason';
+               }
+               _showNotification(productName, body, title: 'Order Update');
+            }
+          }
+        }
+      }
+    });
+  }
+
+  Future<void> _showNotification(String titleOrProductName, String bodyOrSellerName, {String? title}) async {
     const AndroidNotificationDetails androidPlatformChannelSpecifics =
         AndroidNotificationDetails(
-      'new_product_channel',
-      'New Products',
-      channelDescription: 'Notifications for newly added products',
+      'order_updates_channel',
+      'Order Updates',
+      channelDescription: 'Notifications for order updates',
       importance: Importance.max,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
@@ -95,8 +129,8 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     
     await flutterLocalNotificationsPlugin.show(
       id: DateTime.now().millisecond,
-      title: 'New Product!',
-      body: '$sellerName has added $productName.',
+      title: title ?? 'New Product!',
+      body: title != null ? bodyOrSellerName : '$bodyOrSellerName has added $titleOrProductName.',
       notificationDetails: platformChannelSpecifics,
     );
   }
@@ -140,7 +174,7 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
     BuyerDashboardHome(onTabChange: _onItemTapped),
     const Center(child: Text("Categories")), // Placeholder for Categories
     const CartScreen(),
-    const Center(child: Text("Orders")), // Placeholder for Orders
+    const MyOrdersScreen(), // My Orders Screen
     const ProfileScreen(),
   ];
 

@@ -240,11 +240,28 @@ class _SellerDashboardState extends State<SellerDashboard> {
           Row(
             children: [
               Expanded(
-                child: _buildStatCard(
-                  title: "Today's Earnings",
-                  value: "₹0", // Should be fetched from DB
-                  icon: Icons.currency_rupee,
-                  color: const Color(0xFF4CAF50),
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('orders')
+                      .where('sellerId', isEqualTo: uid)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    double totalEarnings = 0;
+                    if (snapshot.hasData) {
+                      for (var doc in snapshot.data!.docs) {
+                        var data = doc.data() as Map<String, dynamic>;
+                        if (data['status'] == 'Delivered' || data['status'] == 'delivered') {
+                          totalEarnings += (data['totalAmount'] ?? data['total'] ?? 0.0).toDouble();
+                        }
+                      }
+                    }
+                    return _buildStatCard(
+                      title: "Total Earnings",
+                      value: "₹${totalEarnings.toStringAsFixed(0)}",
+                      icon: Icons.currency_rupee,
+                      color: const Color(0xFF4CAF50),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: 16),
@@ -320,8 +337,6 @@ class _SellerDashboardState extends State<SellerDashboard> {
                 FirebaseFirestore.instance
                     .collection('orders')
                     .where('sellerId', isEqualTo: uid)
-                    .orderBy('createdAt', descending: true)
-                    .limit(5)
                     .get(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
@@ -336,12 +351,26 @@ class _SellerDashboardState extends State<SellerDashboard> {
                 return _buildEmptyState();
               }
 
+              var orders = snapshot.data!.docs.toList();
+              orders.sort((a, b) {
+                var aData = a.data() as Map<String, dynamic>;
+                var bData = b.data() as Map<String, dynamic>;
+                Timestamp? aTime = aData['createdAt'] as Timestamp?;
+                Timestamp? bTime = bData['createdAt'] as Timestamp?;
+                if (aTime == null && bTime == null) return 0;
+                if (aTime == null) return 1;
+                if (bTime == null) return -1;
+                return bTime.compareTo(aTime);
+              });
+              
+              int itemCount = orders.length > 5 ? 5 : orders.length;
+
               return ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: snapshot.data!.docs.length,
+                itemCount: itemCount,
                 itemBuilder: (context, index) {
-                  final order = snapshot.data!.docs[index];
+                  final order = orders[index];
                   return Card(
                     elevation: 1,
                     shape: RoundedRectangleBorder(
@@ -371,7 +400,7 @@ class _SellerDashboardState extends State<SellerDashboard> {
                         style: TextStyle(color: Colors.grey[600]),
                       ),
                       trailing: Text(
-                        '₹${order['total'] ?? '0'}',
+                        '₹${order['totalAmount'] ?? order['total'] ?? '0'}',
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,

@@ -28,6 +28,75 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
     super.dispose();
   }
 
+  Future<bool> _showDeclineDialog(String orderId) async {
+    TextEditingController reasonController = TextEditingController();
+    bool confirmed = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Decline Order", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Why are you declining this order?"),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: "Reason",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                if (reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("A reason is required to decline")));
+                  return;
+                }
+                confirmed = true;
+                Navigator.pop(context);
+              },
+              child: const Text("Decline", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed) {
+      try {
+        await FirebaseFirestore.instance.collection("orders").doc(orderId).update({
+          "status": "declined",
+          "cancelReason": reasonController.text.trim(),
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Order declined"), backgroundColor: AppColors.error),
+          );
+        }
+        return true;
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to decline order: $e"), backgroundColor: AppColors.error),
+          );
+        }
+      }
+    }
+    return false;
+  }
+
   void _updateOrderStatus(String orderId, String newStatus) async {
     try {
       await FirebaseFirestore.instance
@@ -130,11 +199,30 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
             
             Widget orderCard = _buildOrderCard(doc.id, order);
 
-            if (nextStatus != null) {
+            bool isPending = currentStatus.toLowerCase() == "pending";
+
+            if (nextStatus != null || isPending) {
               return Dismissible(
                 key: Key(doc.id),
-                direction: DismissDirection.endToStart,
-                background: Container(
+                direction: isPending ? DismissDirection.horizontal : DismissDirection.endToStart,
+                background: isPending ? Container(
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 20),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Icon(Icons.close, color: Colors.white),
+                      SizedBox(width: 8),
+                      Text("DECLINE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ],
+                  ),
+                ) : Container(),
+                secondaryBackground: Container(
                   alignment: Alignment.centerRight,
                   padding: const EdgeInsets.only(right: 20),
                   margin: const EdgeInsets.only(bottom: 16),
@@ -146,14 +234,22 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       const Text("Mark as ", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                      Text(nextStatus, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                      Text(nextStatus ?? "", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       const SizedBox(width: 8),
                       const Icon(Icons.check_circle, color: Colors.white),
                     ],
                   ),
                 ),
+                confirmDismiss: (direction) async {
+                  if (direction == DismissDirection.startToEnd && isPending) {
+                    return await _showDeclineDialog(doc.id);
+                  }
+                  return true; // allow to proceed to onDismissed for endToStart
+                },
                 onDismissed: (direction) {
-                  _updateOrderStatus(doc.id, nextStatus);
+                  if (direction == DismissDirection.endToStart && nextStatus != null) {
+                    _updateOrderStatus(doc.id, nextStatus);
+                  }
                 },
                 child: orderCard,
               );
