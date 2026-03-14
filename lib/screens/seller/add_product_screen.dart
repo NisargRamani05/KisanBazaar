@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:kisanbazaar/theme/app_colors.dart';
 import 'package:kisanbazaar/screens/seller/seller_dashboard.dart';
 import 'package:intl/intl.dart';
@@ -153,13 +154,20 @@ class _AddProductScreenState extends State<AddProductScreen>
         throw Exception('User not logged in');
       }
 
-      // Convert image bytes to base64 string (already compressed at pick time)
-      final String imageBase64 = base64Encode(_imageBytes!);
-      debugPrint('Image base64 length: ${imageBase64.length} chars (${(_imageBytes!.length / 1024).toStringAsFixed(1)} KB)');
-      
-      // Check if base64 image is too large for Firestore (max ~700KB of base64 to stay safe)
-      if (imageBase64.length > 700000) {
-        throw Exception('Image is too large. Please pick a smaller image.');
+      String imageUrl = '';
+      try {
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('product_images')
+            .child('${DateTime.now().millisecondsSinceEpoch}_${currentUser.uid}.jpg');
+
+        final uploadTask = storageRef.putData(
+            _imageBytes!, SettableMetadata(contentType: 'image/jpeg'));
+        
+        final snapshot = await uploadTask;
+        imageUrl = await snapshot.ref.getDownloadURL();
+      } catch (e) {
+        throw Exception('Failed to upload image: $e');
       }
 
       DocumentSnapshot userDoc =
@@ -204,16 +212,14 @@ class _AddProductScreenState extends State<AddProductScreen>
         'quantity': parsedQuantity,
         'category': category,
         'seller_name': sellerName,
-        'image': imageBase64,
+        'imageUrl': imageUrl,
         'sellerId': sellerId,
-        'created_at': FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       };
 
       if (harvestDate.isNotEmpty) {
         productData['harvest_date'] = harvestDate;
       }
-
-      debugPrint('Product data fields: name=$productName, price=$parsedPrice, qty=$parsedQuantity, category=$category, imageLen=${imageBase64.length}');
 
       debugPrint('Adding product to Firestore...');
       await FirebaseFirestore.instance.collection('products').add(productData);

@@ -100,7 +100,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             "paymentMethod": _selectedPaymentMethod,
             "deliveryAddress": _userAddress + (_userPhone.isNotEmpty ? '\n$_userPhone' : ''),
             "status": "pending", // lowercase for seller dashboard
-            "image": item['image'],
+            "image": item['imageUrl'] ?? item['image'] ?? '',
+            "imageUrl": item['imageUrl'] ?? item['image'] ?? '',
             "timestamp": FieldValue.serverTimestamp(),
             "createdAt": FieldValue.serverTimestamp(), // for seller dashboard
             "orderDate": FieldValue.serverTimestamp(),
@@ -142,7 +143,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           "paymentMethod": _selectedPaymentMethod,
           "deliveryAddress": _userAddress + (_userPhone.isNotEmpty ? '\n$_userPhone' : ''),
           "status": "pending", // lowercase for seller dashboard
-          "image": item['image'],
+          "image": item['imageUrl'] ?? item['image'] ?? '',
+          "imageUrl": item['imageUrl'] ?? item['image'] ?? '',
           "timestamp": FieldValue.serverTimestamp(),
           "createdAt": FieldValue.serverTimestamp(), // for seller dashboard
           "orderDate": FieldValue.serverTimestamp(),

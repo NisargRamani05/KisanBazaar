@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kisanbazaar/screens/seller/edit_product_screen.dart';
+import 'package:kisanbazaar/widgets/kisan_image.dart';
 
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({super.key});
@@ -239,30 +240,12 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
               // Product Image
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: imageBase64 != null && imageBase64.isNotEmpty
-                    ? (imageBase64.startsWith('http')
-                        ? Image.network(
-                            imageBase64,
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          )
-                        : Image.memory(
-                            base64Decode(imageBase64),
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          ))
-                    : Container(
-                        width: 100,
-                        height: 100,
-                        color: Colors.grey[300],
-                        child: const Icon(
-                          Icons.image_not_supported,
-                          size: 40,
-                          color: Colors.grey,
-                        ),
-                      ),
+                child: KisanImage(
+                  imageSource: productData['imageUrl'] ?? productData['image'] ?? '',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                ),
               ),
 
               const SizedBox(width: 16),

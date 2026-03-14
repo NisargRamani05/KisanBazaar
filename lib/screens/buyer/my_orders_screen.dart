@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:kisanbazaar/theme/app_colors.dart';
+import 'package:kisanbazaar/widgets/kisan_image.dart';
 
 class MyOrdersScreen extends StatefulWidget {
   const MyOrdersScreen({super.key});
@@ -115,11 +116,12 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: orderData['image'] != null && orderData['image'].isNotEmpty
-                                ? (orderData['image'].startsWith('http')
-                                    ? Image.network(orderData['image'], width: 70, height: 70, fit: BoxFit.cover)
-                                    : Image.memory(base64Decode(orderData['image']), width: 70, height: 70, fit: BoxFit.cover))
-                                : Container(width: 70, height: 70, color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
+                            child: KisanImage(
+                              imageSource: orderData['imageUrl'] ?? orderData['image'] ?? '',
+                              width: 70,
+                              height: 70,
+                              fit: BoxFit.cover,
+                            ),
                           ),
                           const SizedBox(width: 16),
                           Expanded(

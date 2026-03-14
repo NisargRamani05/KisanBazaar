@@ -1,6 +1,6 @@
 // ignore_for_file: use_build_context_synchronously
 
-import 'dart:convert' show base64Encode;
+import 'dart:convert' show base64Encode, base64Decode;
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +8,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:kisanbazaar/widgets/kisan_image.dart';
 
 class EditProductScreen extends StatefulWidget {
   final String productId;
@@ -44,7 +46,7 @@ class _EditProductScreenState extends State<EditProductScreen> {
     _quantityController = TextEditingController(text: widget.productData['quantity']?.toString() ?? '');
     _categoryController = TextEditingController(text: widget.productData['category'] ?? '');
     _sellerNameController = TextEditingController(text: widget.productData['seller_name'] ?? '');
-    _existingImageUrl = widget.productData['image'];
+    _existingImageUrl = widget.productData['imageUrl'] ?? widget.productData['image'];
   }
 
   @override
@@ -105,11 +107,27 @@ class _EditProductScreenState extends State<EditProductScreen> {
         },
       );
 
-      // Convert new image to base64, otherwise keep existing image string
-      String imageToSave = _existingImageUrl ?? '';
+      // Upload new image to Storage if picked
+      String finalImageUrl = _existingImageUrl ?? '';
+      String finalImageBase64Fallback = widget.productData['image'] ?? ''; 
+
       if (_imageBytes != null) {
-        imageToSave = base64Encode(_imageBytes!);
-        debugPrint('Edit: Image base64 length: ${imageToSave.length} chars');
+        try {
+          final currentUser = FirebaseAuth.instance.currentUser;
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('product_images')
+              .child('${DateTime.now().millisecondsSinceEpoch}_${currentUser?.uid ?? 'unknown'}.jpg');
+
+          final uploadTask = storageRef.putData(
+              _imageBytes!, SettableMetadata(contentType: 'image/jpeg'));
+          
+          final snapshot = await uploadTask;
+          finalImageUrl = await snapshot.ref.getDownloadURL();
+          finalImageBase64Fallback = finalImageUrl; // Both fields can be url now
+        } catch (e) {
+          throw Exception('Failed to upload new image: $e');
+        }
       }
 
       await FirebaseFirestore.instance
@@ -121,7 +139,8 @@ class _EditProductScreenState extends State<EditProductScreen> {
         'quantity': int.parse(_quantityController.text),
         'category': _categoryController.text,
         'seller_name': _sellerNameController.text,
-        'image': imageToSave,
+        'imageUrl': finalImageUrl,
+        'image': finalImageBase64Fallback, // Backward compatibility
         'updated_at': FieldValue.serverTimestamp(),
       });
 
@@ -206,12 +225,12 @@ class _EditProductScreenState extends State<EditProductScreen> {
                             : _existingImageUrl != null && _existingImageUrl!.isNotEmpty
                                 ? ClipRRect(
                                     borderRadius: BorderRadius.circular(75),
-                                    child: Image.network(
-                                            _existingImageUrl!,
-                                            fit: BoxFit.cover,
-                                            width: 150,
-                                            height: 150,
-                                          ),
+                                    child: KisanImage(
+                                      imageSource: _existingImageUrl!,
+                                      width: 150,
+                                      height: 150,
+                                      fit: BoxFit.cover,
+                                    ),
                                   )
                                 : Column(
                                     mainAxisAlignment: MainAxisAlignment.center,

@@ -12,6 +12,9 @@ import 'package:kisanbazaar/theme/app_colors.dart';
 import 'package:kisanbazaar/screens/buyer/product_details_screen.dart'
     as kisanbazaar;
 import 'package:kisanbazaar/screens/buyer/my_orders_screen.dart';
+import 'package:kisanbazaar/widgets/modern_product_card.dart';
+import 'package:kisanbazaar/widgets/modern_search_bar.dart';
+import 'package:kisanbazaar/widgets/category_item.dart';
 
 class BuyerDashboard extends StatefulWidget {
   const BuyerDashboard({super.key});
@@ -39,41 +42,25 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   Future<void> _initializeNotifications() async {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
-    
     const DarwinInitializationSettings initializationSettingsIOS = DarwinInitializationSettings();
-    
     const InitializationSettings initializationSettings = InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
-
-    await flutterLocalNotificationsPlugin.initialize(
-      settings: initializationSettings,
-    );
-
-    final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
-        flutterLocalNotificationsPlugin.resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestNotificationsPermission();
+    await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
   }
 
   void _listenForNewProducts() {
-    FirebaseFirestore.instance
-        .collection('products')
-        .snapshots()
-        .listen((snapshot) {
+    FirebaseFirestore.instance.collection('products').snapshots().listen((snapshot) {
       if (_isInitialLoad) {
         _isInitialLoad = false;
         return;
       }
-
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.added) {
-          var data = change.doc.data() as Map<String, dynamic>?;
+          var data = change.doc.data();
           if (data != null) {
-            String productName = data['name'] ?? 'A new product';
-            String sellerName = data['seller_name'] ?? 'A seller';
-            _showNotification(productName, sellerName);
+            _showNotification(data['name'] ?? 'New Product', data['seller_name'] ?? 'A seller');
           }
         }
       }
@@ -83,29 +70,18 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   void _listenForOrderUpdates() {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
-
     FirebaseFirestore.instance
         .collection('orders')
         .where('buyerId', isEqualTo: userId)
         .snapshots()
         .listen((snapshot) {
-      if (_isInitialLoad) return; // Wait until initial data is loaded to avoid spam
-
+      if (_isInitialLoad) return;
       for (var change in snapshot.docChanges) {
         if (change.type == DocumentChangeType.modified) {
-          var data = change.doc.data() as Map<String, dynamic>?;
+          var data = change.doc.data();
           if (data != null) {
             String status = data['status'] ?? '';
-            String productName = data['productName'] ?? 'Your order';
-            String reason = data['cancelReason'] ?? '';
-
-            if (status.isNotEmpty) {
-               String body = 'Order status updated to ${status.toUpperCase()}';
-               if ((status.toLowerCase() == 'declined' || status.toLowerCase() == 'cancelled') && reason.isNotEmpty) {
-                 body += '. Reason: $reason';
-               }
-               _showNotification(productName, body, title: 'Order Update');
-            }
+            _showNotification(data['productName'] ?? 'Order Update', 'Status: ${status.toUpperCase()}', title: 'Order Update');
           }
         }
       }
@@ -113,24 +89,14 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
   }
 
   Future<void> _showNotification(String titleOrProductName, String bodyOrSellerName, {String? title}) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'order_updates_channel',
-      'Order Updates',
-      channelDescription: 'Notifications for order updates',
-      importance: Importance.max,
-      priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+    const AndroidNotificationDetails androidPlatformChannelSpecifics = AndroidNotificationDetails(
+      'order_updates_channel', 'Order Updates', importance: Importance.max, priority: Priority.high,
     );
-    
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-    );
-    
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
     await flutterLocalNotificationsPlugin.show(
       id: DateTime.now().millisecond,
       title: title ?? 'New Product!',
-      body: title != null ? bodyOrSellerName : '$bodyOrSellerName has added $titleOrProductName.',
+      body: title != null ? bodyOrSellerName : '$bodyOrSellerName added $titleOrProductName.',
       notificationDetails: platformChannelSpecifics,
     );
   }
@@ -143,109 +109,109 @@ class _BuyerDashboardState extends State<BuyerDashboard> {
         .where('buyerId', isEqualTo: userId)
         .snapshots()
         .listen((snapshot) {
-          if (mounted) {
-            setState(() {
-              _cartCount = snapshot.docs.length;
-            });
-          }
-        });
+      if (mounted) setState(() => _cartCount = snapshot.docs.length);
+    });
   }
 
   Future<void> _loadSelectedIndex() async {
     final prefs = await SharedPreferences.getInstance();
-    int savedIndex = prefs.getInt('buyer_selectedIndex') ?? 0;
-
-    // Validate index to prevent RangeError
-    if (savedIndex >= _pages.length || savedIndex < 0) {
-      savedIndex = 0;
-    }
-
-    setState(() {
-      _selectedIndex = savedIndex;
-    });
+    setState(() => _selectedIndex = (prefs.getInt('buyer_selectedIndex') ?? 0).clamp(0, 4));
   }
 
-  Future<void> _saveSelectedIndex(int index) async {
+  void _onItemTapped(int index) async {
+    setState(() => _selectedIndex = index);
     final prefs = await SharedPreferences.getInstance();
     prefs.setInt('buyer_selectedIndex', index);
-  }
-
-  List<Widget> get _pages => [
-    BuyerDashboardHome(onTabChange: _onItemTapped),
-    const Center(child: Text("Categories")), // Placeholder for Categories
-    const CartScreen(),
-    const MyOrdersScreen(), // My Orders Screen
-    const ProfileScreen(),
-  ];
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    _saveSelectedIndex(index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: _pages[_selectedIndex],
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -5),
-              ),
-            ],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          BuyerDashboardHome(onTabChange: _onItemTapped),
+          const Center(child: Text("Explore Categories")),
+          const CartScreen(),
+          const MyOrdersScreen(),
+          const ProfileScreen(),
+        ],
+      ),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5)),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(0, Icons.home_rounded, "Home"),
+                _buildNavItem(1, Icons.grid_view_rounded, "Explore"),
+                _buildCartNavItem(2),
+                _buildNavItem(3, Icons.receipt_long_rounded, "Orders"),
+                _buildNavItem(4, Icons.person_rounded, "Profile"),
+              ],
+            ),
           ),
-          child: BottomNavigationBar(
-            items: [
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.home_outlined),
-                activeIcon: Icon(Icons.home),
-                label: "Home",
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.grid_view_outlined),
-                activeIcon: Icon(Icons.grid_view),
-                label: "Explore",
-              ),
-              BottomNavigationBarItem(
-                icon: Badge(
-                  label: Text('$_cartCount'),
-                  isLabelVisible: _cartCount > 0,
-                  child: const Icon(Icons.shopping_cart_outlined),
-                ),
-                activeIcon: Badge(
-                  label: Text('$_cartCount'),
-                  isLabelVisible: _cartCount > 0,
-                  child: const Icon(Icons.shopping_cart),
-                ),
-                label: "Cart",
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.receipt_long_outlined),
-                activeIcon: Icon(Icons.receipt_long),
-                label: "Orders",
-              ),
-              const BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline),
-                activeIcon: Icon(Icons.person),
-                label: "Profile",
-              ),
-            ],
-            currentIndex: _selectedIndex,
-            selectedItemColor: AppColors.primary,
-            unselectedItemColor: Colors.grey,
-            showUnselectedLabels: true,
-            type: BottomNavigationBarType.fixed,
-            onTap: _onItemTapped,
-            elevation: 0,
-            backgroundColor: Colors.white,
-          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    bool isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? AppColors.primary : AppColors.textSecondary, size: 24),
+            const SizedBox(height: 4),
+            Text(label, style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textSecondary, fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCartNavItem(int index) {
+    bool isSelected = _selectedIndex == index;
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Badge(
+              label: Text('$_cartCount'),
+              isLabelVisible: _cartCount > 0,
+              backgroundColor: AppColors.primary,
+              child: Icon(Icons.shopping_cart_rounded, color: isSelected ? AppColors.primary : AppColors.textSecondary, size: 24),
+            ),
+            const SizedBox(height: 4),
+            Text("Cart", style: TextStyle(color: isSelected ? AppColors.primary : AppColors.textSecondary, fontSize: 10, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500)),
+          ],
         ),
       ),
     );
@@ -262,17 +228,17 @@ class BuyerDashboardHome extends StatefulWidget {
 
 class _BuyerDashboardHomeState extends State<BuyerDashboardHome> {
   String _selectedCategory = "All";
-  final List<String> _categories = [
-    "All",
-    "Vegetables",
-    "Fruits",
-    "Dairy",
-    "Grains",
-    "Other",
+  final List<Map<String, String>> _categories = [
+    {"title": "All", "emoji": "🍱"},
+    {"title": "Vegetables", "emoji": "🥦"},
+    {"title": "Fruits", "emoji": "🍎"},
+    {"title": "Dairy", "emoji": "🥛"},
+    {"title": "Grains", "emoji": "🌾"},
+    {"title": "Other", "emoji": "✨"},
   ];
 
   String _address = "Fetching address...";
-  String _profileImage = "";
+  String _userName = "User";
 
   @override
   void initState() {
@@ -283,685 +249,222 @@ class _BuyerDashboardHomeState extends State<BuyerDashboardHome> {
   void _fetchUserData() {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId != null) {
-      FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .snapshots()
-          .listen((snapshot) {
-            if (snapshot.exists && mounted) {
-              setState(() {
-                _address =
-                    snapshot.data()?['address'] ??
-                    "Add your address in profile";
-                _profileImage = snapshot.data()?['image'] ?? "";
-              });
-            }
+      FirebaseFirestore.instance.collection('users').doc(userId).snapshots().listen((snapshot) {
+        if (snapshot.exists && mounted) {
+          setState(() {
+            _address = snapshot.data()?['address'] ?? "Add your address in profile";
+            _userName = snapshot.data()?['name'] ?? "User";
           });
+        }
+      });
     }
   }
 
-  void addToCart(BuildContext context, Map<String, dynamic> productData) async {
+  void addToCart(Map<String, dynamic> productData) async {
     String? userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
-
     FirebaseFirestore firestore = FirebaseFirestore.instance;
-
-    // Check if the product is already in the cart
-    QuerySnapshot existingCartItem =
-        await firestore
-            .collection('cart')
-            .where('buyerId', isEqualTo: userId)
-            .where('productId', isEqualTo: productData['productId'])
-            .get();
-
-    if (existingCartItem.docs.isNotEmpty) {
-      // If the product is already in the cart, update the quantity
-      DocumentSnapshot cartItem = existingCartItem.docs.first;
-      int currentQuantity = cartItem['quantity'] ?? 0;
-      await cartItem.reference.update({
-        'quantity': currentQuantity + 1, // Increment quantity
-      });
+    QuerySnapshot existing = await firestore.collection('cart').where('buyerId', isEqualTo: userId).where('productId', isEqualTo: productData['productId']).get();
+    if (existing.docs.isNotEmpty) {
+      await existing.docs.first.reference.update({'quantity': (existing.docs.first['quantity'] ?? 0) + 1});
     } else {
       await firestore.collection('cart').add({
-        'buyerId': userId,
-        'productId': productData['productId'],
-        'name': productData['name'],
-        'price': productData['price'],
-        'quantity': 1,
-        'unit': productData['unit'],
-        'image': productData['image'],
-        'sellerName': productData['seller_name'],
-        'sellerId': productData['sellerId'] ?? "",
+        'buyerId': userId, 'productId': productData['productId'], 'name': productData['name'], 'price': productData['price'], 'quantity': 1, 'unit': productData['unit'],
+        'image': productData['imageUrl'] ?? productData['image'] ?? '', 'sellerName': productData['seller_name'], 'sellerId': productData['sellerId'] ?? "",
       });
     }
-
-    Fluttertoast.showToast(
-      msg: "${productData['name']} added to cart!",
-      toastLength: Toast.LENGTH_SHORT,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.primary,
-      textColor: Colors.white,
-      fontSize: 16.0,
-    );
+    Fluttertoast.showToast(msg: "${productData['name']} added to cart!", backgroundColor: AppColors.primary);
   }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      child: CustomScrollView(
-        slivers: [
-          // App Bar with Location & Profile
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 12.0,
-              ),
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        // App Bar
+        SliverAppBar(
+          pinned: true,
+          expandedHeight: 120,
+          backgroundColor: AppColors.surface,
+          scrolledUnderElevation: 0,
+          flexibleSpace: FlexibleSpaceBar(
+            background: Container(
+              padding: const EdgeInsets.fromLTRB(16, 48, 16, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          "Delivering to",
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: AppColors.textSecondary),
-                        ),
+                        Text("Freshly Picked for", style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
-                            const Icon(
-                              Icons.location_on,
-                              color: AppColors.primary,
-                              size: 18,
-                            ),
+                            const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
                             const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                _address.isNotEmpty
-                                    ? _address
-                                    : "Select Location",
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const Icon(
-                              Icons.keyboard_arrow_down,
-                              color: AppColors.primary,
-                            ),
+                            Flexible(child: Text(_address, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                            const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.primary),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
                   GestureDetector(
-                    onTap: () {
-                      if (widget.onTabChange != null) {
-                        widget.onTabChange!(4); // Switch to Profile tab
-                      }
-                    },
-                    child: CircleAvatar(
-                      backgroundColor: AppColors.primaryLight.withOpacity(0.2),
-                      backgroundImage:
-                          _profileImage.isNotEmpty
-                              ? NetworkImage(_profileImage)
-                              : null,
-                      child:
-                          _profileImage.isEmpty
-                              ? const Icon(
-                                Icons.person,
-                                color: AppColors.primary,
-                              )
-                              : null,
+                    onTap: () => widget.onTabChange?.call(4),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 2)),
+                      child: const CircleAvatar(backgroundColor: AppColors.lightGreenBg, child: Icon(Icons.person_outline_rounded, color: AppColors.primary)),
                     ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
 
-          // Search Bar
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16.0,
-                vertical: 8.0,
+        // Sticky Search Bar
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _SearchBarDelegate(),
+        ),
+
+        // Promo Banner
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Container(
+              height: 160,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: const LinearGradient(colors: [Color(0xFFE8F5E9), Color(0xFFC8E6C9)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+                boxShadow: [BoxShadow(color: Colors.green.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))],
               ),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: TextField(
-                  decoration: InputDecoration(
-                    hintText: "Search fresh vegetables, fruits...",
-                    hintStyle: TextStyle(color: Colors.grey.shade400),
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: AppColors.primary,
-                    ),
-                    suffixIcon: const Icon(Icons.mic, color: AppColors.primary),
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 15),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          // Seasonal Banner
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Container(
-                width: double.infinity,
-                height: 140,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFFF3E0), Color(0xFFFFE0B2)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.2),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 3,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.orange,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                "SEASONAL",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            const Text(
-                              "Mango Season Sale!",
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              "Up to 20% off on fresh Ratnagiri",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.black54,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const Expanded(
-                      flex: 2,
-                      child: Center(
-                        child: Text("🥭", style: TextStyle(fontSize: 60)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          // Categories
-          SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    "Categories",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  height: 40,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final category = _categories[index];
-                      final isSelected = _selectedCategory == category;
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: ChoiceChip(
-                          label: Text(category),
-                          selected: isSelected,
-                          onSelected: (selected) {
-                            setState(() {
-                              _selectedCategory = category;
-                            });
-                          },
-                          selectedColor: AppColors.primary,
-                          labelStyle: TextStyle(
-                            color:
-                                isSelected
-                                    ? Colors.white
-                                    : AppColors.textPrimary,
-                            fontWeight:
-                                isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                          ),
-                          backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            side: BorderSide(
-                              color:
-                                  isSelected
-                                      ? AppColors.primary
-                                      : Colors.grey.shade300,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // "Today's Fresh Picks" Section
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Stack(
                 children: [
-                  Text(
-                    "Today's Fresh Picks",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    "See All",
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
+                  Positioned(right: -20, bottom: -20, child: Opacity(opacity: 0.2, child: Icon(Icons.eco_rounded, size: 150, color: AppColors.primary))),
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(8)),
+                          child: const Text("FARM FRESH", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900)),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text("20% Cash Back", style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppColors.primaryDark)),
+                        const Text("on your first organic order", style: TextStyle(fontSize: 14, color: AppColors.primaryDark, fontWeight: FontWeight.w500)),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
           ),
+        ),
 
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
-          // Product Grid
-          StreamBuilder(
-            stream:
-                FirebaseFirestore.instance.collection('products').snapshots(),
-            builder: (context, AsyncSnapshot<QuerySnapshot> snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: CircularProgressIndicator(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  ),
-                );
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.0),
-                      child: Text(
-                        "No products available",
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              // Filter products based on category
-              var products =
-                  snapshot.data!.docs.where((doc) {
-                    var data = doc.data() as Map<String, dynamic>;
-                    if (_selectedCategory == "All") return true;
-                    return data['category'] == _selectedCategory;
-                  }).toList();
-
-              if (products.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        "No $_selectedCategory available",
-                        style: TextStyle(color: Colors.grey[600], fontSize: 16),
-                      ),
-                    ),
-                  ),
-                );
-              }
-
-              return SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                sliver: SliverGrid(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 0.72,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  delegate: SliverChildBuilderDelegate((context, index) {
-                    var doc = products[index];
-                    Map<String, dynamic> data =
-                        doc.data() as Map<String, dynamic>;
-                    data['productId'] = doc.id;
-
-                    return ProductCard(
-                      data: data,
-                      onAdd: () => addToCart(context, data),
-                    );
-                  }, childCount: products.length),
-                ),
-              );
-            },
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 30)),
-        ],
-      ),
-    );
-  }
-}
-
-class ProductCard extends StatefulWidget {
-  final Map<String, dynamic> data;
-  final VoidCallback onAdd;
-
-  const ProductCard({super.key, required this.data, required this.onAdd});
-
-  @override
-  State<ProductCard> createState() => _ProductCardState();
-}
-
-class _ProductCardState extends State<ProductCard>
-    with SingleTickerProviderStateMixin {
-  bool isHovered = false;
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(_controller);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => isHovered = true),
-      onExit: (_) => setState(() => isHovered = false),
-      child: GestureDetector(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => kisanbazaar.ProductDetailsScreen(
-                    productData: widget.data,
-                  ),
-            ),
-          );
-        },
-        onTapDown: (_) => _controller.forward(),
-        onTapUp: (_) => _controller.reverse(),
-        onTapCancel: () => _controller.reverse(),
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color:
-                      isHovered
-                          ? AppColors.primary.withOpacity(0.15)
-                          : Colors.black.withOpacity(0.05),
-                  blurRadius: isHovered ? 15 : 10,
-                  offset: Offset(0, isHovered ? 8 : 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        // Categories Header
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Product Image Container
-                Expanded(
-                  child: Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(16),
-                        ),
-                        child:
-                            (widget.data['image'] != null &&
-                                    widget.data['image'].isNotEmpty)
-                                ? (widget.data['image'].startsWith('http')
-                                    ? Image.network(
-                                        widget.data['image'],
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        fit: BoxFit.cover,
-                                      )
-                                    : Image.memory(
-                                        base64Decode(widget.data['image']),
-                                        width: double.infinity,
-                                        height: double.infinity,
-                                        fit: BoxFit.cover,
-                                      ))
-                                : Container(
-                                  color: Colors.grey[100],
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.image_not_supported,
-                                      color: Colors.grey,
-                                      size: 40,
-                                    ),
-                                  ),
-                                ),
-                      ),
-                      // Distance Badge (Mock)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.location_on,
-                                size: 12,
-                                color: AppColors.primary,
-                              ),
-                              const SizedBox(width: 2),
-                              Text(
-                                "2.5 km",
-                                style: Theme.of(
-                                  context,
-                                ).textTheme.bodySmall?.copyWith(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Details
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.data['name'] ?? "Unknown",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              "By ${widget.data['seller_name'] ?? 'Farmer'}",
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.star, color: Colors.amber, size: 12),
-                          const Text(
-                            " 4.8",
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "₹${widget.data['price'] ?? '0'}",
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              Text(
-                                "per ${widget.data['unit'] ?? 'kg'}",
-                                style: TextStyle(
-                                  color: Colors.grey[500],
-                                  fontSize: 10,
-                                ),
-                              ),
-                            ],
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              _controller.forward().then(
-                                (_) => _controller.reverse(),
-                              );
-                              widget.onAdd();
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
+                const Text("Shop by Category", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                TextButton(onPressed: () {}, child: const Text("See All", style: TextStyle(fontWeight: FontWeight.bold))),
               ],
             ),
           ),
         ),
-      ),
+
+        // Categories List
+        SliverToBoxAdapter(
+          child: SizedBox(
+            height: 50,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _categories.length,
+              itemBuilder: (context, index) {
+                final cat = _categories[index];
+                return CategoryItem(
+                  title: cat['title']!,
+                  emoji: cat['emoji']!,
+                  isSelected: _selectedCategory == cat['title'],
+                  onTap: () => setState(() => _selectedCategory = cat['title']!),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // Products Header
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
+            child: Text("Bestsellers in $_selectedCategory", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+          ),
+        ),
+
+        // Product Grid
+        StreamBuilder(
+          stream: FirebaseFirestore.instance.collection('products').snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator()));
+            var products = snapshot.data!.docs.where((doc) {
+              if (_selectedCategory == "All") return true;
+              return doc['category'] == _selectedCategory;
+            }).toList();
+
+            if (products.isEmpty) {
+              return SliverToBoxAdapter(child: Center(child: Padding(padding: const EdgeInsets.all(40.0), child: Text("No products found in $_selectedCategory"))));
+            }
+
+            return SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.68,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    var data = products[index].data();
+                    data['productId'] = products[index].id;
+                    return ModernProductCard(data: data, onAdd: () => addToCart(data), index: index);
+                  },
+                  childCount: products.length,
+                ),
+              ),
+            );
+          },
+        ),
+
+        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+      ],
     );
   }
+}
+
+class _SearchBarDelegate extends SliverPersistentHeaderDelegate {
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: const ModernSearchBar(),
+    );
+  }
+
+  @override
+  double get maxExtent => 70;
+  @override
+  double get minExtent => 70;
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) => false;
 }

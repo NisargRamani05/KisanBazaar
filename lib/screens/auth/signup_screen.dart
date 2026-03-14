@@ -18,38 +18,22 @@ class _SignupScreenState extends State<SignupScreen> {
   final TextEditingController _fullNameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmPasswordController =
-      TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-
- 
 
   String? selectedRole;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
-  bool _isConfirmPasswordVisible = false;
 
   Future<void> signup() async {
-    // Validate email format
     if (_emailController.text.trim().isEmpty) {
       _showError("Please enter your email");
-      return;
-    }
-    if (!_isValidEmail(_emailController.text.trim())) {
-      _showError("The email address is badly formatted");
-      return;
-    }
-
-    // Validate password strength
-    if (_passwordController.text.isEmpty) {
-      _showError("Please enter a password");
       return;
     }
     if (_passwordController.text.length < 6) {
       _showError("Password should be at least 6 characters");
       return;
     }
-
     if (_passwordController.text != _confirmPasswordController.text) {
       _showError("Passwords do not match");
       return;
@@ -58,19 +42,14 @@ class _SignupScreenState extends State<SignupScreen> {
       _showError("Please select a role");
       return;
     }
-    if (_phoneController.text.isEmpty || _phoneController.text.length != 10) {
-      _showError("Enter a valid 10-digit phone number");
-      return;
-    }
 
     setState(() => _isLoading = true);
 
     try {
-      UserCredential userCredential = await _auth
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
       User? user = userCredential.user;
       if (user != null) {
@@ -83,388 +62,112 @@ class _SignupScreenState extends State<SignupScreen> {
           "createdAt": FieldValue.serverTimestamp(),
         });
 
-        // Send verification email
         await user.sendEmailVerification();
         if (!mounted) return;
 
-        // Show success message
         _showSuccess("Verification email sent! Please check your inbox.");
-
-        // Redirect user to Login screen
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-        );
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen()));
       }
     } on FirebaseAuthException catch (e) {
       _showError(e.message ?? "An error occurred");
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
   void _showSuccess(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.green),
-    );
-  }
-
-  bool _isValidEmail(String email) {
-    // Email validation regex
-    final emailRegex = RegExp(
-      r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$',
-    );
-    return emailRegex.hasMatch(email);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: AppColors.primary));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          "Create Account",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        backgroundColor: const Color(0xFF2E7D32), // Dark Green
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (context) => const LoginScreen()),
-            );
-          },
-        ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  "Join KisaanBazaar",
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2E7D32),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // Role Header
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    "Choose Your Role",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-
-                // Large Role Selection Cards
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => selectedRole = "Buyer"),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: selectedRole == "Buyer"
-                                ? AppColors.primary.withOpacity(0.1)
-                                : AppColors.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: selectedRole == "Buyer"
-                                  ? AppColors.primary
-                                  : AppColors.divider,
-                              width: selectedRole == "Buyer" ? 2 : 1,
-                            ),
-                            boxShadow: [
-                              if (selectedRole == "Buyer")
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                "🛍️",
-                                style: TextStyle(fontSize: 40),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                "Buyer",
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: selectedRole == "Buyer"
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Shop fresh goods",
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => setState(() => selectedRole = "Seller"),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: selectedRole == "Seller"
-                                ? AppColors.primary.withOpacity(0.1)
-                                : AppColors.surface,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: selectedRole == "Seller"
-                                  ? AppColors.primary
-                                  : AppColors.divider,
-                              width: selectedRole == "Seller" ? 2 : 1,
-                            ),
-                            boxShadow: [
-                              if (selectedRole == "Seller")
-                                BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text(
-                                "🚜",
-                                style: TextStyle(fontSize: 40),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                "Farmer",
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: selectedRole == "Seller"
-                                      ? AppColors.primary
-                                      : AppColors.textPrimary,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Sell your produce",
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-
-                // Form Fields
-                _buildTextField(
-                  _fullNameController,
-                  "Full Name",
-                  Icons.person_outline,
-                ),
-                const SizedBox(height: 20),
-                _buildTextField(
-                  _emailController,
-                  "Email",
-                  Icons.email_outlined,
-                ),
-                const SizedBox(height: 20),
-                _buildTextField(
-                  _phoneController,
-                  "Phone Number",
-                  Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 20),
-                _buildPasswordField(
-                  _passwordController,
-                  "Password",
-                  _isPasswordVisible,
-                  () {
-                    setState(() {
-                      _isPasswordVisible = !_isPasswordVisible;
-                    });
-                  },
-                ),
-                const SizedBox(height: 20),
-                _buildPasswordField(
-                  _confirmPasswordController,
-                  "Confirm Password",
-                  _isConfirmPasswordVisible,
-                  () {
-                    setState(() {
-                      _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
-                    });
-                  },
-                ),
-                const SizedBox(height: 30),
-
-                // Sign Up Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : signup,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2E7D32),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 2,
-                    ),
-                    child: _isLoading
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            "Create Account",
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                  ),
-                ),
-                 const SizedBox(height: 20),
-                 Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              "Have an account?",
-                              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => const LoginScreen(),
-                                  ),
-                                );
-                              },
-                              child: const Text(
-                                "Sign In",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF2E7D32),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-              ],
-            ),
+      appBar: AppBar(backgroundColor: Colors.white, elevation: 0, leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary), onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const LoginScreen())))),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Create Account", style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Text("Join our community of farmers and buyers.", style: TextStyle(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 32),
+              const Text("I am a...", style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                   Expanded(child: _roleCard("Buyer", "🛍️", "I want to buy")),
+                   const SizedBox(width: 16),
+                   Expanded(child: _roleCard("Seller", "🚜", "I want to sell")),
+                ],
+              ),
+              const SizedBox(height: 32),
+              _buildTextField(_fullNameController, "Full Name", Icons.person_rounded),
+              const SizedBox(height: 16),
+              _buildTextField(_emailController, "Email Address", Icons.email_rounded),
+              const SizedBox(height: 16),
+              _buildTextField(_phoneController, "Phone Number", Icons.phone_rounded, keyboardType: TextInputType.phone),
+              const SizedBox(height: 16),
+              _buildTextField(_passwordController, "Password", Icons.lock_rounded, isPassword: true),
+              const SizedBox(height: 16),
+              _buildTextField(_confirmPasswordController, "Confirm Password", Icons.lock_clock_rounded, isPassword: true),
+              const SizedBox(height: 40),
+              ElevatedButton(
+                onPressed: _isLoading ? null : signup,
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white, minimumSize: const Size(double.infinity, 56), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)), elevation: 0),
+                child: _isLoading ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)) : const Text("CREATE ACCOUNT", style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+              ),
+              const SizedBox(height: 40),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // Update helper method to match new style
-  @override
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label,
-    IconData icon, {
-    TextInputType? keyboardType,
-  }) {
-    return TextField(
-      controller: controller,
-      keyboardType: keyboardType ?? TextInputType.text,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFF2E7D32)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+  Widget _roleCard(String role, String emoji, String subtitle) {
+    bool isSelected = selectedRole == role;
+    return GestureDetector(
+      onTap: () => setState(() => selectedRole = role),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary.withOpacity(0.05) : AppColors.background,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isSelected ? AppColors.primary : AppColors.divider, width: isSelected ? 2 : 1),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+        child: Column(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(height: 8),
+            Text(role, style: TextStyle(fontWeight: FontWeight.w900, color: isSelected ? AppColors.primary : AppColors.textPrimary)),
+            Text(subtitle, style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.w500)),
+          ],
         ),
-        focusedBorder: OutlineInputBorder(
-           borderRadius: BorderRadius.circular(12),
-           borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
-        filled: true,
-        fillColor: Colors.grey[50],
       ),
     );
   }
 
-  @override
-  Widget _buildPasswordField(
-    TextEditingController controller,
-    String label,
-    bool isVisible,
-    VoidCallback toggleVisibility,
-  ) {
+  Widget _buildTextField(TextEditingController controller, String label, IconData icon, {bool isPassword = false, TextInputType? keyboardType}) {
     return TextField(
       controller: controller,
-      obscureText: !isVisible,
+      obscureText: isPassword && !_isPasswordVisible,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF2E7D32)),
-        suffixIcon: IconButton(
-          icon: Icon(
-            isVisible ? Icons.visibility : Icons.visibility_off,
-            color: Colors.grey[600],
-          ),
-          onPressed: toggleVisibility,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey[300]!),
-        ),
-        focusedBorder: OutlineInputBorder(
-           borderRadius: BorderRadius.circular(12),
-           borderSide: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-        ),
+        prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+        suffixIcon: isPassword ? IconButton(icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility, color: AppColors.textSecondary, size: 20), onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible)) : null,
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: AppColors.background.withOpacity(0.5),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       ),
     );
   }
