@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:kisanbazaar/screens/seller/edit_product_screen.dart';
 import 'package:kisanbazaar/widgets/kisan_image.dart';
+import 'package:kisanbazaar/theme/app_colors.dart';
 
 class MyProductsScreen extends StatefulWidget {
   const MyProductsScreen({super.key});
@@ -100,32 +101,83 @@ class _MyProductsScreenState extends State<MyProductsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF4CAF50), Color(0xFFF5F5F5)],
-            stops: [0.0, 0.15],
-          ),
-        ),
+        color: AppColors.background,
         child: Column(
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Row(
-                children: const [
-                  Icon(Icons.inventory_2, color: Colors.white, size: 28),
-                  SizedBox(width: 12),
-                  Text(
-                    'My Products',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+            // Premium Header
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1B5E20), Color(0xFF388E3C), Color(0xFF43A047)],
+                ),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(28),
+                  bottomRight: Radius.circular(28),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: const Icon(Icons.inventory_2_rounded, color: Colors.white, size: 26),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'My Products',
+                              style: TextStyle(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('products')
+                                  .where('sellerId', isEqualTo: currentUserId)
+                                  .snapshots(),
+                              builder: (context, snap) {
+                                int count = snap.hasData ? snap.data!.docs.length : 0;
+                                return Text(
+                                  '$count product${count != 1 ? 's' : ''} listed',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.white.withOpacity(0.75),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
 

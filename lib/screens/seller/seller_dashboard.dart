@@ -119,16 +119,44 @@ class _SellerDashboardState extends State<SellerDashboard> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'KisanBazaar - Farmer',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.eco_rounded, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'KisaanBazaar',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: 0.5),
+            ),
+          ],
         ),
-        backgroundColor: AppColors.primary,
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1B5E20), Color(0xFF388E3C), Color(0xFF43A047)],
+            ),
+          ),
+        ),
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _showLogoutDialog,
+          Container(
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.account_circle_rounded, size: 26),
+              onPressed: () => _onItemTapped(4),
+            ),
           ),
         ],
       ),

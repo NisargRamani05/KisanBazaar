@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -20,7 +19,7 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -98,12 +97,24 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
     return false;
   }
 
-  void _updateOrderStatus(String orderId, String newStatus) async {
+  void _updateOrderStatus(String orderId, String newStatus, {Map<String, dynamic>? orderData}) async {
     try {
+      Map<String, dynamic> updateFields = {"status": newStatus.toLowerCase()};
+
+      // Also save buyer info into the order document so it persists across status changes
+      if (orderData != null) {
+        if (orderData['buyerName'] != null && orderData['buyerName'].toString().trim().isNotEmpty) {
+          updateFields['buyerName'] = orderData['buyerName'];
+        }
+        if (orderData['buyerPhone'] != null && orderData['buyerPhone'].toString().trim().isNotEmpty) {
+          updateFields['buyerPhone'] = orderData['buyerPhone'];
+        }
+      }
+
       await FirebaseFirestore.instance
           .collection("orders")
           .doc(orderId)
-          .update({"status": newStatus.toLowerCase()});
+          .update(updateFields);
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,34 +138,121 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text("Order Management", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 3,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: const [
-            Tab(text: "Pending"),
-            Tab(text: "Packed"),
-            Tab(text: "Delivered"),
-          ],
-        ),
-      ),
-      body: sellerId == null
-          ? const Center(child: Text("User not authenticated"))
-          : TabBarView(
-              controller: _tabController,
-              children: [
-                _buildOrderList("Pending", "Packed"),
-                _buildOrderList("Packed", "Delivered"),
-                _buildOrderList("Delivered", null),
-              ],
+      body: Column(
+        children: [
+          // Premium Header with Tabs
+          Container(
+            width: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF1B5E20), Color(0xFF388E3C), Color(0xFF43A047)],
+              ),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(28),
+                bottomRight: Radius.circular(28),
+              ),
             ),
+            child: SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 26),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Order Management',
+                                style: TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('orders')
+                                    .where('sellerId', isEqualTo: sellerId)
+                                    .where('status', isEqualTo: 'pending')
+                                    .snapshots(),
+                                builder: (context, snap) {
+                                  int count = snap.hasData ? snap.data!.docs.length : 0;
+                                  return Text(
+                                    count > 0 ? '$count pending order${count != 1 ? 's' : ''}' : 'All caught up!',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white.withOpacity(0.75),
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // Tab Bar
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      indicator: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      labelColor: AppColors.primaryDark,
+                      unselectedLabelColor: Colors.white.withOpacity(0.8),
+                      labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w500, fontSize: 14),
+                      padding: const EdgeInsets.all(4),
+                      tabs: const [
+                        Tab(text: "Pending"),
+                        Tab(text: "Delivered"),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          ),
+          // Order List
+          Expanded(
+            child: sellerId == null
+                ? const Center(child: Text("User not authenticated"))
+                : TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildOrderList("Pending", "Delivered"),
+                      _buildOrderList("Delivered", null),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -245,12 +343,12 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
                   if (direction == DismissDirection.startToEnd && isPending) {
                     return await _showDeclineDialog(doc.id);
                   }
-                  return true; // allow to proceed to onDismissed for endToStart
-                },
-                onDismissed: (direction) {
+                  // For endToStart (mark as delivered), update status and return false
+                  // Let the StreamBuilder handle UI removal when Firestore updates
                   if (direction == DismissDirection.endToStart && nextStatus != null) {
-                    _updateOrderStatus(doc.id, nextStatus);
+                    _updateOrderStatus(doc.id, nextStatus, orderData: order);
                   }
+                  return false; // Don't dismiss - StreamBuilder will remove it automatically
                 },
                 child: orderCard,
               );
@@ -263,17 +361,47 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
   }
 
   Widget _buildOrderCard(String orderId, Map<String, dynamic> order) {
-    return FutureBuilder<DocumentSnapshot>(
-      future: FirebaseFirestore.instance.collection("users").doc(order['buyerId']).get(),
-      builder: (context, buyerSnapshot) {
-        String buyerName = "Processing...";
-        String buyerMobile = "...";
-        
-        if (buyerSnapshot.hasData && buyerSnapshot.data!.exists) {
-          buyerName = buyerSnapshot.data!['fullName'] ?? "Unknown Buyer";
-          buyerMobile = buyerSnapshot.data!['phone'] ?? "No Phone";
-        }
+    // Check if buyer info is already in the order document
+    final bool hasBuyerName = order['buyerName'] != null && order['buyerName'].toString().trim().isNotEmpty;
+    final bool hasBuyerPhone = order['buyerPhone'] != null && order['buyerPhone'].toString().trim().isNotEmpty;
 
+    String buyerName = hasBuyerName ? order['buyerName'] : "Buyer";
+    String buyerPhone = hasBuyerPhone ? order['buyerPhone'] : "";
+
+    // For old orders without buyer info, try to extract phone from deliveryAddress
+    // (deliveryAddress often contains phone on a new line)
+    if (!hasBuyerPhone && order['deliveryAddress'] != null) {
+      String address = order['deliveryAddress'].toString();
+      List<String> lines = address.split('\n');
+      if (lines.length > 1) {
+        // Last line might be the phone number
+        String possiblePhone = lines.last.trim();
+        if (possiblePhone.startsWith('+') || RegExp(r'^[\d\s\-]{7,}').hasMatch(possiblePhone)) {
+          buyerPhone = possiblePhone;
+        }
+      }
+    }
+
+    // If we still don't have a phone, show N/A
+    if (buyerPhone.isEmpty) {
+      buyerPhone = "N/A";
+    }
+
+    return _buildOrderCardContent(
+      orderId,
+      order,
+      buyerName,
+      buyerPhone,
+    );
+  }
+
+  Widget _buildOrderCardContent(
+    String orderId,
+    Map<String, dynamic> order,
+    String buyerName,
+    String buyerMobile, {
+    bool isLoading = false,
+  }) {
         String orderDate = order['orderDate'] != null
             ? DateFormat('dd MMM yyyy, hh:mm a').format(order['orderDate'].toDate())
             : "Unknown time";
@@ -291,7 +419,13 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
                   children: [
                     CircleAvatar(
                       backgroundColor: AppColors.primaryLight.withOpacity(0.2),
-                      child: Text(buyerName[0].toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      child: isLoading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            )
+                          : Text(buyerName.isNotEmpty ? buyerName[0].toUpperCase() : '?', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -299,7 +433,16 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(buyerName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(orderDate, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Icon(Icons.phone_outlined, size: 14, color: Colors.grey[500]),
+                              const SizedBox(width: 4),
+                              Text(buyerMobile, style: TextStyle(color: Colors.grey[600], fontSize: 13, fontWeight: FontWeight.w500)),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(orderDate, style: TextStyle(color: Colors.grey[500], fontSize: 12)),
                         ],
                       ),
                     ),
@@ -319,6 +462,30 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
                 ),
               ),
               const Divider(height: 1),
+              // Delivery Details Section
+              if (order['deliveryAddress'] != null && order['deliveryAddress'].toString().isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text("Delivery details", style: TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(order['deliveryAddress'] ?? "No Address", style: const TextStyle(fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+              ],
               // Bottom Section (Product Details)
               Padding(
                 padding: const EdgeInsets.all(16),
@@ -385,7 +552,5 @@ class _OrderReceivedScreenState extends State<OrderReceivedScreen> with SingleTi
             ],
           ),
         );
-      },
-    );
   }
 }

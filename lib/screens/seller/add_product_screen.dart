@@ -39,7 +39,7 @@ class _AddProductScreenState extends State<AddProductScreen>
   ];
 
   String _selectedUnit = '/kg';
-  final List<String> _units = ['/kg', '/gm', '/dozen', '/pc'];
+  final List<String> _units = ['/kg','/liter', '/gm', '/dozen', '/pc'];
 
   File? _image;
   Uint8List? _imageBytes;
@@ -167,7 +167,16 @@ class _AddProductScreenState extends State<AddProductScreen>
         final snapshot = await uploadTask;
         imageUrl = await snapshot.ref.getDownloadURL();
       } catch (e) {
-        throw Exception('Failed to upload image: $e');
+        debugPrint('Firebase Storage upload failed: $e. Falling back to base64.');
+        try {
+          String base64String = base64Encode(_imageBytes!);
+          if (base64String.length > 800000) {
+            throw Exception('Image is too large. Please select a smaller image.');
+          }
+          imageUrl = base64String;
+        } catch (fallbackError) {
+          throw Exception('Failed to upload image: $e\nFallback failed: $fallbackError');
+        }
       }
 
       DocumentSnapshot userDoc =
@@ -213,6 +222,7 @@ class _AddProductScreenState extends State<AddProductScreen>
         'category': category,
         'seller_name': sellerName,
         'imageUrl': imageUrl,
+        'image': imageUrl, // Ensure backward compatibility with the fallback string
         'sellerId': sellerId,
         'createdAt': FieldValue.serverTimestamp(),
       };

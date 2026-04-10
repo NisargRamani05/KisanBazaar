@@ -126,7 +126,17 @@ class _EditProductScreenState extends State<EditProductScreen> {
           finalImageUrl = await snapshot.ref.getDownloadURL();
           finalImageBase64Fallback = finalImageUrl; // Both fields can be url now
         } catch (e) {
-          throw Exception('Failed to upload new image: $e');
+          debugPrint('Firebase Storage upload failed: $e. Falling back to base64.');
+          try {
+            String base64String = base64Encode(_imageBytes!);
+            if (base64String.length > 800000) {
+              throw Exception('Image too large. Please select a smaller image.');
+            }
+            finalImageUrl = base64String;
+            finalImageBase64Fallback = base64String;
+          } catch(fallbackError) {
+             throw Exception('Failed to upload new image: $e\nFallback failed: $fallbackError');
+          }
         }
       }
 

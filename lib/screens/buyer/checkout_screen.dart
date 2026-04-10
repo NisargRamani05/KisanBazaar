@@ -19,18 +19,22 @@ class CheckoutScreen extends StatefulWidget {
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
   String _selectedPaymentMethod = "Cash on Delivery";
-  String _selectedAddress = "Home";
+  int _selectedAddressIndex = 0;
   bool _isLoading = false;
-  String _userAddress = "Loading address...";
+
+  // Multiple addresses
+  List<Map<String, dynamic>> _addresses = [];
   String _userPhone = "";
+  String _buyerName = "";
+  String _buyerPhone = "";
 
   @override
   void initState() {
     super.initState();
-    _fetchUserAddress();
+    _fetchUserAddresses();
   }
 
-  Future<void> _fetchUserAddress() async {
+  Future<void> _fetchUserAddresses() async {
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
       if (userId != null) {
@@ -38,27 +42,219 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (userDoc.exists && mounted) {
           final data = userDoc.data() as Map<String, dynamic>?;
           setState(() {
-            _userAddress = data?['address'] ?? 'No address set. Please update in profile.';
             _userPhone = data?['phone'] ?? '';
+            _buyerName = data?['fullName'] ?? data?['name'] ?? 'Buyer';
+            _buyerPhone = data?['phone'] ?? '';
+
+            if (data?['addresses'] != null && data!['addresses'] is List && (data['addresses'] as List).isNotEmpty) {
+              _addresses = List<Map<String, dynamic>>.from(
+                (data['addresses'] as List).map((e) => Map<String, dynamic>.from(e)),
+              );
+              // Select the default address
+              for (int i = 0; i < _addresses.length; i++) {
+                if (_addresses[i]['isDefault'] == true) {
+                  _selectedAddressIndex = i;
+                  break;
+                }
+              }
+            } else {
+              // Legacy single address fallback
+              String legacyAddress = data?['address'] ?? '';
+              if (legacyAddress.isNotEmpty) {
+                _addresses = [
+                  {
+                    'label': 'Home',
+                    'address': legacyAddress,
+                    'phone': _userPhone,
+                    'isDefault': true,
+                  }
+                ];
+              }
+            }
           });
         }
       }
     } catch (e) {
-      debugPrint('Error fetching address: $e');
-      if (mounted) {
-        setState(() {
-          _userAddress = 'Could not load address';
-        });
-      }
+      debugPrint('Error fetching addresses: $e');
     }
+  }
+
+  String _getSelectedDeliveryAddress() {
+    if (_addresses.isEmpty) return 'No address set';
+    final addr = _addresses[_selectedAddressIndex];
+    String fullAddress = addr['address'] ?? '';
+    String phone = addr['phone'] ?? _userPhone;
+    if (phone.isNotEmpty) {
+      fullAddress += '\n$phone';
+    }
+    return fullAddress;
+  }
+
+  void _showAddAddressBottomSheet() {
+    final addressController = TextEditingController();
+    final phoneController = TextEditingController(text: _userPhone);
+    String selectedLabel = 'Home';
+    final labels = ['Home', 'Office', 'Work', 'Other'];
+    final customLabelController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24, right: 24, top: 24,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40, height: 4,
+                        decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text("Add New Address", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+
+                    const Text("Address Type", style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      children: labels.map((label) {
+                        bool selected = selectedLabel == label;
+                        return ChoiceChip(
+                          label: Text(label),
+                          selected: selected,
+                          selectedColor: AppColors.primaryLight.withOpacity(0.3),
+                          labelStyle: TextStyle(
+                            color: selected ? AppColors.primary : Colors.grey[700],
+                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          onSelected: (val) => setModalState(() => selectedLabel = label),
+                        );
+                      }).toList(),
+                    ),
+                    if (selectedLabel == 'Other') ...[
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: customLabelController,
+                        decoration: InputDecoration(
+                          labelText: "Custom Label",
+                          hintText: "e.g. Grandma's House",
+                          prefixIcon: const Icon(Icons.label_outline, color: AppColors.primary),
+                          filled: true, fillColor: AppColors.background,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: addressController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        labelText: "Full Address *",
+                        hintText: "House No, Street, City, PIN",
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(bottom: 40),
+                          child: Icon(Icons.location_on_rounded, color: AppColors.primary),
+                        ),
+                        filled: true, fillColor: AppColors.background,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: "Phone Number",
+                        prefixIcon: const Icon(Icons.phone_rounded, color: AppColors.primary),
+                        filled: true, fillColor: AppColors.background,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          if (addressController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Please enter an address"), backgroundColor: AppColors.error),
+                            );
+                            return;
+                          }
+
+                          String finalLabel = selectedLabel == 'Other'
+                              ? (customLabelController.text.trim().isEmpty ? 'Other' : customLabelController.text.trim())
+                              : selectedLabel;
+
+                          final newAddress = {
+                            'label': finalLabel,
+                            'address': addressController.text.trim(),
+                            'phone': phoneController.text.trim(),
+                            'isDefault': _addresses.isEmpty,
+                          };
+
+                          setState(() {
+                            _addresses.add(newAddress);
+                            _selectedAddressIndex = _addresses.length - 1;
+                          });
+
+                          // Also save to Firestore
+                          try {
+                            final userId = FirebaseAuth.instance.currentUser?.uid;
+                            if (userId != null) {
+                              await FirebaseFirestore.instance.collection('users').doc(userId).update({
+                                'addresses': _addresses,
+                              });
+                            }
+                          } catch (e) {
+                            debugPrint('Error saving address: $e');
+                          }
+
+                          if (mounted) Navigator.pop(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: const Text("Add & Use This Address", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 16)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Future<void> placeOrder() async {
     if (widget.totalAmount <= 0) return;
+    if (_addresses.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please add a delivery address first"), backgroundColor: AppColors.error),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
-
-    // Payment gateway integration has been removed.
-    // All orders will be processed as Cash on Delivery.
     await _processOrder();
   }
 
@@ -69,6 +265,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (buyerId == null) throw Exception("User not logged in");
 
       FirebaseFirestore firestore = FirebaseFirestore.instance;
+      String deliveryAddress = _getSelectedDeliveryAddress();
 
       for (var item in widget.cartItems) {
         String productId = item['productId'];
@@ -83,33 +280,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         DocumentSnapshot productSnapshot = await retry2;
 
         if (!productSnapshot.exists) {
-          // Product missing – still record the order with a placeholder so the flow continues
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Product not found: $productName. Recording as unavailable."), backgroundColor: Colors.orange),
           );
-          // Create a minimal order entry using placeholder data
           final placeholderOrder = {
             "buyerId": buyerId,
+            "buyerName": _buyerName,
+            "buyerPhone": _buyerPhone,
             "sellerId": sellerId,
             "productId": productId,
             "productName": "$productName (Unavailable)",
             "quantity": orderedQuantity,
             "totalAmount": price * orderedQuantity,
-            "total": price * orderedQuantity, // for seller dashboard
+            "total": price * orderedQuantity,
             "paymentMethod": _selectedPaymentMethod,
-            "deliveryAddress": _userAddress + (_userPhone.isNotEmpty ? '\n$_userPhone' : ''),
-            "status": "pending", // lowercase for seller dashboard
+            "deliveryAddress": deliveryAddress,
+            "status": "pending",
             "image": item['imageUrl'] ?? item['image'] ?? '',
             "imageUrl": item['imageUrl'] ?? item['image'] ?? '',
             "timestamp": FieldValue.serverTimestamp(),
-            "createdAt": FieldValue.serverTimestamp(), // for seller dashboard
+            "createdAt": FieldValue.serverTimestamp(),
             "orderDate": FieldValue.serverTimestamp(),
           };
           await retry(() async {
             await firestore.collection("orders").add(placeholderOrder);
           });
-          // Skip stock update but continue to cart cleanup
           continue;
         }
 
@@ -134,19 +330,21 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
         Map<String, dynamic> orderData = {
           "buyerId": buyerId,
+          "buyerName": _buyerName,
+          "buyerPhone": _buyerPhone,
           "sellerId": sellerId,
           "productId": productId,
           "productName": productName,
           "quantity": orderedQuantity,
           "totalAmount": price * orderedQuantity,
-          "total": price * orderedQuantity, // for seller dashboard
+          "total": price * orderedQuantity,
           "paymentMethod": _selectedPaymentMethod,
-          "deliveryAddress": _userAddress + (_userPhone.isNotEmpty ? '\n$_userPhone' : ''),
-          "status": "pending", // lowercase for seller dashboard
+          "deliveryAddress": deliveryAddress,
+          "status": "pending",
           "image": item['imageUrl'] ?? item['image'] ?? '',
           "imageUrl": item['imageUrl'] ?? item['image'] ?? '',
           "timestamp": FieldValue.serverTimestamp(),
-          "createdAt": FieldValue.serverTimestamp(), // for seller dashboard
+          "createdAt": FieldValue.serverTimestamp(),
           "orderDate": FieldValue.serverTimestamp(),
         };
 
@@ -154,7 +352,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           await firestore.collection("orders").add(orderData);
         });
 
-        // Ensure cart is cleared regardless of product availability
         QuerySnapshot cartSnapshot = await firestore.collection("cart").where("buyerId", isEqualTo: buyerId).get();
         for (var doc in cartSnapshot.docs) {
           await doc.reference.delete();
@@ -162,7 +359,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       }
 
       if (!mounted) return;
-      
+
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -187,8 +384,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context); // Close dialog
-                      Navigator.pop(context); // Go back to cart (which will be empty) or home
+                      Navigator.pop(context);
+                      Navigator.pop(context);
                     },
                     style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
                     child: const Text("Back to Home", style: TextStyle(color: Colors.white)),
@@ -242,11 +439,56 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Delivery Address
-                const Text("Delivery Address", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                // Delivery Address section
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text("Delivery Address", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                    if (_addresses.length > 1)
+                      TextButton(
+                        onPressed: () => _showAddressSelector(),
+                        child: const Text("Change", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 12),
-                _buildAddressCard("Home", _userAddress + (_userPhone.isNotEmpty ? '\n$_userPhone' : '')),
-                const SizedBox(height: 24),
+
+                if (_addresses.isEmpty)
+                  GestureDetector(
+                    onTap: _showAddAddressBottomSheet,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.primary, style: BorderStyle.solid),
+                      ),
+                      child: Column(
+                        children: [
+                          Icon(Icons.add_location_alt_outlined, size: 36, color: Colors.grey[400]),
+                          const SizedBox(height: 8),
+                          const Text("Add Delivery Address", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 16)),
+                          const SizedBox(height: 4),
+                          Text("Tap to add your address", style: TextStyle(color: Colors.grey[500], fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  _buildSelectedAddressCard(),
+
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _showAddAddressBottomSheet,
+                    icon: const Icon(Icons.add_circle_outline, size: 18, color: AppColors.primary),
+                    label: const Text("Add New Address", style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
 
                 // Order Summary Card
                 const Text("Order Summary", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
@@ -269,7 +511,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                             Text("₹${(double.tryParse(item['price'].toString()) ?? 0.0) * item['quantity']}", style: const TextStyle(fontWeight: FontWeight.bold)),
                           ],
                         ),
-                      )).toList(),
+                      )),
                       const Divider(),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -303,7 +545,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 const Text("Payment Method", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
                 const SizedBox(height: 12),
                 _buildPaymentOption("Cash on Delivery", Icons.money),
-                
+
                 const SizedBox(height: 24),
 
                 // Trust Indicators
@@ -319,7 +561,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ],
             ),
           ),
-          
+
           // Bottom CTA
           Positioned(
             bottom: 0,
@@ -339,7 +581,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                   ),
                   onPressed: _isLoading ? null : placeOrder,
-                  child: _isLoading 
+                  child: _isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : Text(
                           "Confirm Order • ₹${widget.totalAmount}",
@@ -354,44 +596,165 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _buildAddressCard(String type, String address) {
-    bool isSelected = _selectedAddress == type;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedAddress = type),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryLight.withOpacity(0.1) : Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey[200]!, width: isSelected ? 2 : 1),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.home, color: isSelected ? AppColors.primary : Colors.grey),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(type, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      if (isSelected) const Icon(Icons.check_circle, color: AppColors.primary, size: 20),
-                    ],
-                  ),
+  Widget _buildSelectedAddressCard() {
+    final addr = _addresses[_selectedAddressIndex];
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primaryLight.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary, width: 2),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            addr['label'] == 'Home'
+                ? Icons.home_rounded
+                : addr['label'] == 'Office' || addr['label'] == 'Work'
+                    ? Icons.business_rounded
+                    : Icons.location_on_rounded,
+            color: AppColors.primary,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(addr['label'] ?? 'Address', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.check_circle, color: AppColors.primary, size: 18),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(addr['address'] ?? '', style: TextStyle(color: Colors.grey[600], height: 1.5)),
+                if (addr['phone'] != null && addr['phone'].toString().isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  Text(address, style: TextStyle(color: Colors.grey[600], height: 1.5)),
+                  Text("📞 ${addr['phone']}", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
                 ],
+              ],
+            ),
+          ),
+          if (_addresses.length > 1)
+            GestureDetector(
+              onTap: _showAddressSelector,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.swap_horiz, color: AppColors.primary, size: 20),
               ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
+  void _showAddressSelector() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text("Choose Delivery Address", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ...List.generate(_addresses.length, (index) {
+                final addr = _addresses[index];
+                bool isSelected = _selectedAddressIndex == index;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedAddressIndex = index);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primaryLight.withOpacity(0.1) : Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : Colors.grey[200]!,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          addr['label'] == 'Home'
+                              ? Icons.home_rounded
+                              : addr['label'] == 'Office' || addr['label'] == 'Work'
+                                  ? Icons.business_rounded
+                                  : Icons.location_on_rounded,
+                          color: isSelected ? AppColors.primary : Colors.grey,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Text(addr['label'] ?? 'Address',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 16,
+                                      color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  if (addr['isDefault'] == true) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text("Default", style: TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.bold)),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(addr['address'] ?? '', style: TextStyle(color: Colors.grey[600], height: 1.4, fontSize: 13)),
+                              if (addr['phone'] != null && addr['phone'].toString().isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text("📞 ${addr['phone']}", style: TextStyle(color: Colors.grey[500], fontSize: 12)),
+                              ],
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle, color: AppColors.primary, size: 22),
+                      ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
 
   Widget _buildPaymentOption(String name, IconData icon) {
     bool isSelected = _selectedPaymentMethod == name;
